@@ -1,0 +1,299 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  phone     String?
+  role      Role     @default(STUDENT)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  student   Student?
+  adminUser AdminUser?
+  
+  @@map("users")
+}
+
+model Student {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Personal Information
+  dateOfBirth     DateTime?
+  gender          String?
+  nationality     String?
+  address         String?
+  city            String?
+  state           String?
+  postalCode      String?
+  country         String?
+  
+  // Emergency Contact
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  emergencyContactEmail String?
+  
+  // Academic Information
+  previousEducation     String?
+  workExperience       String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  registrations   Registration[]
+  enrollments     Enrollment[]
+  progress        StudentProgress[]
+  
+  @@map("students")
+}
+
+model AdminUser {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department String?
+  permissions String[] @default([])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@map("admin_users")
+}
+
+model Registration {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  // Course Information
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+  
+  // Registration Details
+  status      RegistrationStatus @default(PENDING)
+  message     String?
+  documents   String[] @default([])
+  
+  // Admin Actions
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  rejectionReason String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("registrations")
+}
+
+model Course {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  category     String
+  level        String   @default("Beginner")
+  duration     String
+  price        Float
+  currency     String   @default("NGN")
+  
+  // Course Structure
+  modules      CourseModule[]
+  
+  // Metadata
+  imageUrl     String?
+  isActive     Boolean  @default(true)
+  maxStudents  Int?
+  prerequisites String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  registrations Registration[]
+  enrollments   Enrollment[]
+  progress      StudentProgress[]
+  
+  @@map("courses")
+}
+
+model CourseModule {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  orderIndex  Int
+  
+  // Module Content
+  lessons     Lesson[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("course_modules")
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  moduleId    String
+  module      CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  content     String?
+  videoUrl    String?
+  duration    String?
+  orderIndex  Int
+  
+  // Lesson Resources
+  resources   String[] @default([])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  progress    LessonProgress[]
+  
+  @@map("lessons")
+}
+
+model Enrollment {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+  
+  status      EnrollmentStatus @default(ACTIVE)
+  enrolledAt  DateTime @default(now())
+  completedAt DateTime?
+  
+  // Payment Information
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod String?
+  transactionId String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([studentId, courseId])
+  @@map("enrollments")
+}
+
+model StudentProgress {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+  
+  // Progress Tracking
+  completedLessons Int @default(0)
+  totalLessons     Int @default(0)
+  progressPercent  Float @default(0)
+  
+  // Time Tracking
+  totalTimeSpent   Int @default(0) // in minutes
+  lastAccessedAt   DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  lessonProgress LessonProgress[]
+  
+  @@unique([studentId, courseId])
+  @@map("student_progress")
+}
+
+model LessonProgress {
+  id          String   @id @default(cuid())
+  progressId  String
+  progress    StudentProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id])
+  
+  isCompleted Boolean  @default(false)
+  completedAt DateTime?
+  timeSpent   Int      @default(0) // in minutes
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([progressId, lessonId])
+  @@map("lesson_progress")
+}
+
+model YouTubeVideo {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  videoId     String   @unique // YouTube video ID
+  url         String   // Full YouTube URL
+  thumbnailUrl String?
+  
+  // Categorization
+  category    String
+  tags        String[] @default([])
+  courseId    String?  // Optional: link to specific course
+  
+  // Metadata
+  duration    String?
+  publishedAt DateTime?
+  viewCount   Int      @default(0)
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("youtube_videos")
+}
+
+// Enums
+enum Role {
+  STUDENT
+  ADMIN
+  INSTRUCTOR
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  SUSPENDED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
